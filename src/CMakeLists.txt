@@ -1,5 +1,5 @@
-﻿add_executable (graph_decomposition main.cpp)
+﻿add_executable (parallel_computing main.cpp)
 
 if (CMAKE_VERSION VERSION_GREATER 3.12)
-  set_property(TARGET graph_decomposition PROPERTY CXX_STANDARD 20)
+  set_property(TARGET parallel_computing PROPERTY CXX_STANDARD 20)
 endif()
