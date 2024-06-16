@@ -72,6 +72,28 @@ public:
 	}
 };
 
+class SparseMatrix {
+public:
+	int nRows = 0;
+	int* IA = nullptr;
+	int* JA = nullptr;
+	double* A = nullptr;
+
+	SparseMatrix(int _nRows) {
+		nRows = _nRows;
+		IA = new int[nRows + 1];
+		// fill IA arrays
+		JA = new int[IA[nRows]];
+		A = new double[IA[nRows]];
+	}
+
+	~SparseMatrix() {
+		delete[] IA;
+		delete[] JA;
+		delete[] A;
+	}
+};
+
 // Генерация графа/портрета разреженной матрицы по заданной сетке
 void Generate() {
 }
