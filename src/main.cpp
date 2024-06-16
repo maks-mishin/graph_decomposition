@@ -170,6 +170,64 @@ public:
 	void PrintSourceGrid(); // печать исходной решетки для построения сетки
 };
 
+void Mesh::PrintTopology() {
+	cout << "Nodes:" << endl;
+	for (const auto& node : nodes) {
+		cout << "Node " << node.id << " (" << node.coord[0] << ", " << node.coord[1] << ") nodeEdges: ";
+		for (const auto& edgeId : node.edges) {
+			cout << edgeId << " ";
+		}
+		cout << endl;
+	}
+
+	cout << "Edges:" << endl;
+	for (const auto& edge : edges) {
+		cout << "Edge " << edge.id << " (" << edge.vertices[0] << ", " << edge.vertices[1] << "): ";
+		cout << "Cells " << edge.cells[0] << ", " << edge.cells[1] << endl;
+	}
+
+	cout << "Cells:" << endl;
+	for (const auto& cell : cells) {
+		cout << "Cell " << cell.id << " Center (" << cell.coordCenter[0] << ", " << cell.coordCenter[1] << "): ";
+		cout << "Edges: ";
+		for (const auto& edgeId : cell.edges) {
+			cout << edgeId << " ";
+		}
+		cout << "Vertices: ";
+		for (const auto& vertexId : cell.vertices) {
+			cout << vertexId << " ";
+		}
+		cout << endl;
+	}
+}
+
+void Mesh::PrintSourceGrid() {
+	int globalCellId = 0;
+	int cellWidth = 5;
+
+	for (int i = 0; i < Nx; i++) {
+		for (int j = 0; j < Ny; ++j) {
+			cout << "+";
+			cout << string(cellWidth, '-');
+		}
+		cout << "+" << endl;
+
+		for (int j = 0; j < Ny; j++) {
+			if (globalCellId < K1)
+				cout << "| " << setw(cellWidth - 2) << " " << " ";
+			else
+				cout << "| " << setw(cellWidth - 2) << "/" << " ";
+			globalCellId = (globalCellId + 1) % (K1 + K2);
+		}
+		cout << "|" << endl;
+	}
+	for (int j = 0; j < Ny; ++j) {
+		cout << "+";
+		cout << string(cellWidth, '-');
+	}
+	cout << "+" << endl;
+}
+
 // Генерация графа/портрета разреженной матрицы по заданной сетке
 void Generate() {
 }
