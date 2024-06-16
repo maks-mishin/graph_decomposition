@@ -228,6 +228,161 @@ void Mesh::PrintSourceGrid() {
 	cout << "+" << endl;
 }
 
+void Mesh::CreateTopology() {
+	// построение топологии заданной сетки
+	double cellSize = 1.0; //размер каждой ячейки, все ячейки квадратные пока что
+	int globalCellId = 0;
+
+	// Create nodes (for rect and triangle cells same code)
+	int nodeId = 0;
+	map<tuple<int, int>, int> nodeMap;
+
+	for (int i = 0; i <= Nx; i++) {
+		for (int j = 0; j <= Ny; j++) {
+			nodes.push_back({ nodeId, i * cellSize, j * cellSize });
+			nodeMap[{i, j}] = nodeId;
+			nodeId++;
+		}
+	}
+
+	// Create cells and edges
+	int cellId = 0, edgeId = 0;
+	// делаем обход по прямоугольным ячейкам, некоторые из них деляется на треугольники
+	for (int i = 0; i < Nx; i++) {
+		for (int j = 0; j < Ny; j++) {
+			// поставить условие на тот случай, если будут треугольные ячейки
+
+			if (globalCellId < K1) {
+				// обрабатываем как просто прямоугольные ячейки
+				tuple<double, double> cellCenter = { (i + 0.5) * cellSize, (j + 0.5) * cellSize };
+				cells.push_back({ cellId, get<0>(cellCenter), get<1>(cellCenter) });
+
+				Cell& cell = cells.back();
+				cell.id = cellId;
+				cellId++;
+
+				int v0 = nodeMap[{i, j}];
+				int v1 = nodeMap[{i + 1, j}];
+				int v2 = nodeMap[{i + 1, j + 1}];
+				int v3 = nodeMap[{i, j + 1}];
+
+				cell.vertices = { v0, v1, v2, v3 };
+				vector<tuple<int, int>> edgeVertices = {
+					{v0, v1}, {v1, v2}, {v2, v3}, {v3, v0}
+				};
+				// Define edges of the cell
+				for (const auto& ev : edgeVertices) {
+					if (mapNodeToEdgeId.find(ev) == mapNodeToEdgeId.end()) {
+						edges.push_back({ edgeId, get<0>(ev), get<1>(ev) });
+						mapNodeToEdgeId[ev] = edgeId;
+						mapNodeToEdgeId[{get<1>(ev), get<0>(ev)}] = edgeId;
+						edgeId++;
+					}
+					cell.edges.insert(mapNodeToEdgeId[ev]);
+				}
+			}
+			else {
+				// делим прямоугольную ячейку на две треугольные из правого верхнего угла в нижний левый
+				// первая ячейка, центр ячейки находим как центр тяжести треугольника
+				{
+					tuple<double, double> cellCenter = {
+					(i * cellSize + i * cellSize + (i + 1) * cellSize) / 3.0,
+					(j * cellSize + j * cellSize + (j + 1) * cellSize) / 3.0
+					};
+					cells.push_back({ cellId, get<0>(cellCenter), get<1>(cellCenter) });
+					Cell& cell = cells.back();
+					cell.id = cellId;
+					cellId++;
+
+					int v0 = nodeMap[{i, j}];
+					int v1 = nodeMap[{i + 1, j}];
+					int v2 = nodeMap[{i, j + 1}];
+
+					cell.vertices = { v0, v1, v2 };
+					vector<tuple<int, int>> edgeVertices = {
+						{v0, v1}, {v1, v2}, {v2, v0}
+					};
+					// Define edges of the cell
+					for (const auto& ev : edgeVertices) {
+						if (mapNodeToEdgeId.find(ev) == mapNodeToEdgeId.end()) {
+							edges.push_back({ edgeId, get<0>(ev), get<1>(ev) });
+							mapNodeToEdgeId[ev] = edgeId;
+							mapNodeToEdgeId[{get<1>(ev), get<0>(ev)}] = edgeId;
+							edgeId++;
+						}
+						cell.edges.insert(mapNodeToEdgeId[ev]);
+					}
+				}
+
+				// вторая ячейка
+				{
+					tuple<double, double> cellCenter = {
+					(i * cellSize + (i + 1) * cellSize + (i + 1) * cellSize) / 3.0,
+					(j * cellSize + (j + 1) * cellSize + (j + 1) * cellSize) / 3.0
+					};
+					cells.push_back({ cellId, get<0>(cellCenter), get<1>(cellCenter) });
+					Cell& cell = cells.back();
+					cell.id = cellId;
+					cellId++;
+
+					int v0 = nodeMap[{i, j + 1}];
+					int v1 = nodeMap[{i + 1, j}];
+					int v2 = nodeMap[{i + 1, j + 1}];
+
+					cell.vertices = { v0, v1, v2 };
+					vector<tuple<int, int>> edgeVertices = {
+						{v0, v1}, {v1, v2}, {v2, v0}
+					};
+					// Define edges of the cell
+					for (const auto& ev : edgeVertices) {
+						if (mapNodeToEdgeId.find(ev) == mapNodeToEdgeId.end()) {
+							edges.push_back({ edgeId, get<0>(ev), get<1>(ev) });
+							mapNodeToEdgeId[ev] = edgeId;
+							mapNodeToEdgeId[{get<1>(ev), get<0>(ev)}] = edgeId;
+							edgeId++;
+						}
+						cell.edges.insert(mapNodeToEdgeId[ev]);
+					}
+				}
+			}
+			globalCellId = (globalCellId + 1) % (K1 + K2);
+		}
+	}
+
+	// Fill edges array of each node
+	for (auto& node : nodes) {
+		for (const auto& edge : edges) {
+			bool matchNodes = node.id == edge.vertices[0] || node.id == edge.vertices[1];
+			if (!matchNodes) continue;
+
+			node.edges.insert(edge.id);
+		}
+	}
+
+	// Set two cells that edge divides
+	for (auto& edge : edges) {
+		for (auto& cell : cells) {
+			for (auto& cellEdgeId : cell.edges) {
+				if (edge.id == cellEdgeId) {
+					if (edge.cells[0] == -1) edge.cells[0] = cell.id;
+					if (edge.cells[1] == -1 && edge.cells[0] != cell.id) edge.cells[1] = cell.id;
+				}
+			}
+		}
+	}
+}
+
+void FillGraph(const Mesh& mesh, SimpleGraph& graph) {
+	for (const auto& [ev, edgeId] : mesh.mapNodeToEdgeId) {
+		// добавляем ребро в граф, дублирование вычислений, но пусть так
+		graph.AddEdge(get<0>(ev), get<1>(ev));
+
+		// добавляем 1 на главную диагональ, каждая вершина графа сама себе сосед
+		// для построения разреженной матрицы
+		graph.AddEdge(get<0>(ev), get<0>(ev));
+	}
+}
+
 // Генерация графа/портрета разреженной матрицы по заданной сетке
 void Generate() {
 }
@@ -244,7 +399,15 @@ void Solve() {
 void Report() {
 }
 
-int main()
-{
+int main() {
+	Mesh mesh(6, 6, 3, 4, DivideCellsTriangle::LEFT);
+	mesh.PrintSourceGrid();
+	mesh.CreateTopology();
+
+	SimpleGraph graph;
+	graph.Init(mesh.nodes.size());
+	// заполнение графа по заданной сетке
+	FillGraph(mesh, graph);
+	graph.PrintMatrixAdjacency();
 	return 0;
 }
